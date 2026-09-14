@@ -1,0 +1,12 @@
+name: bankmarketing-training-env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pandas=1.5.3
+  - numpy=1.23.5
+  - scikit-learn=1.5.2
+  - pip:
+      - mlflow-skinny==2.9.2
+      - azureml-mlflow==1.57.0

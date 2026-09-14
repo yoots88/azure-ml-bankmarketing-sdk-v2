@@ -1,0 +1,34 @@
+# deployment/conda_inference.yaml
+#
+# LAST-RESORT fallback only. Prefer deploy.py (no-code MLflow
+# deployment) or, if you must use a custom score.py, prefer
+# deploy_custom_environment.py, which downloads the *exact* conda.yaml
+# the winning AutoML trial was trained with instead of guessing
+# versions here.
+#
+# A hand-typed file like this one is the most common cause of "the
+# deployment succeeds but scoring calls/health checks fail": AutoML's
+# own package set (azureml-automl-runtime, azureml-train-automl-*,
+# etc.) is what actually unpickles the model, and those versions are
+# tied to the specific curated AutoML environment used at training
+# time - they drift with every Azure ML platform update.
+
+name: bankmarketing-inference
+
+channels:
+  - conda-forge
+
+dependencies:
+  - python=3.9
+  - pip
+  - pip:
+      - azureml-defaults
+      - azureml-automl-runtime
+      - azureml-train-automl-runtime
+      - azureml-inference-server-http==1.5.1
+      - scikit-learn==1.5.2
+      - numpy==1.23.5
+      - pandas==1.5.3
+      - scipy==1.10.1
+      - xgboost
+      - joblib

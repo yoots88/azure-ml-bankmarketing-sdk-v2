@@ -1,0 +1,56 @@
+artifact_path: outputs/mlflow-model
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.10.19
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: pickle
+    sklearn_version: 1.5.1
+metadata:
+  azureml.base_image: mcr.microsoft.com/azureml/curated/ai-ml-automl:41
+  azureml.engine: automl
+mlflow_version: 2.15.1
+model_size_bytes: 1481796
+model_uuid: 34a3ef8d376545a486fbf8f4111a79cb
+run_id: ivory_worm_z0wbhqwv9s_8
+signature:
+  inputs: '[{"type": "long", "name": "age", "required": true}, {"type": "boolean",
+    "name": "marital", "required": true}, {"type": "boolean", "name": "default", "required":
+    true}, {"type": "boolean", "name": "housing", "required": true}, {"type": "boolean",
+    "name": "loan", "required": true}, {"type": "long", "name": "month", "required":
+    true}, {"type": "long", "name": "day_of_week", "required": true}, {"type": "long",
+    "name": "duration", "required": true}, {"type": "long", "name": "campaign", "required":
+    true}, {"type": "long", "name": "pdays", "required": true}, {"type": "long", "name":
+    "previous", "required": true}, {"type": "boolean", "name": "poutcome", "required":
+    true}, {"type": "double", "name": "emp.var.rate", "required": true}, {"type":
+    "double", "name": "cons.price.idx", "required": true}, {"type": "double", "name":
+    "cons.conf.idx", "required": true}, {"type": "double", "name": "euribor3m", "required":
+    true}, {"type": "double", "name": "nr.employed", "required": true}, {"type": "boolean",
+    "name": "job_admin.", "required": true}, {"type": "boolean", "name": "job_blue-collar",
+    "required": true}, {"type": "boolean", "name": "job_entrepreneur", "required":
+    true}, {"type": "boolean", "name": "job_housemaid", "required": true}, {"type":
+    "boolean", "name": "job_management", "required": true}, {"type": "boolean", "name":
+    "job_retired", "required": true}, {"type": "boolean", "name": "job_self-employed",
+    "required": true}, {"type": "boolean", "name": "job_services", "required": true},
+    {"type": "boolean", "name": "job_student", "required": true}, {"type": "boolean",
+    "name": "job_technician", "required": true}, {"type": "boolean", "name": "job_unemployed",
+    "required": true}, {"type": "boolean", "name": "job_unknown", "required": true},
+    {"type": "boolean", "name": "contact_cellular", "required": true}, {"type": "boolean",
+    "name": "contact_telephone", "required": true}, {"type": "boolean", "name": "education_basic.4y",
+    "required": true}, {"type": "boolean", "name": "education_basic.6y", "required":
+    true}, {"type": "boolean", "name": "education_basic.9y", "required": true}, {"type":
+    "boolean", "name": "education_high.school", "required": true}, {"type": "boolean",
+    "name": "education_illiterate", "required": true}, {"type": "boolean", "name":
+    "education_professional.course", "required": true}, {"type": "boolean", "name":
+    "education_university.degree", "required": true}, {"type": "boolean", "name":
+    "education_unknown", "required": true}]'
+  outputs: '[{"type": "tensor", "tensor-spec": {"dtype": "bool", "shape": [-1]}}]'
+  params: null
+utc_time_created: '2026-09-14 03:30:10.612424'
