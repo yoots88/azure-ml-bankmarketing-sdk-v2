@@ -1,0 +1,9 @@
+azure-ai-ml
+azure-identity
+mltable
+mlflow
+azureml-mlflow
+pandas
+requests
+python-dotenv
+ipykernel

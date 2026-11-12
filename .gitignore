@@ -1,23 +1,17 @@
-# Azure ML generated files
-outputs/
-.azureml/
-logs/
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Python
-__pycache__/
-*.py[cod]
-
-# Local environments
 .venv/
-venv/
-env/
-
-# Environment / secrets
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.pytest_cache/
 .env
-
-# OS
+.env.*
+!.env.example
+config.json
+outputs/
+logs/
+*.log
+*.key
+*.pem
+*.pfx
 .DS_Store
 Thumbs.db
