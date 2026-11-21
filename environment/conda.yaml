@@ -8,5 +8,6 @@ dependencies:
   - numpy=1.23.5
   - scikit-learn=1.5.2
   - pip:
+      - mltable==1.7.0
       - mlflow-skinny==2.9.2
       - azureml-mlflow==1.57.0

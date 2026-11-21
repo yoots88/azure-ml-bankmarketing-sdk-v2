@@ -1,0 +1,9 @@
+paths:
+  - file: azureml://subscriptions/cf903865-71df-48c8-9cb3-1938981c8c3a/resourcegroups/rg-udacity-azureml/workspaces/udacity-project/datastores/workspaceblobstore/paths/UI/2026-11-12_044606_UTC/bankmarketing_train.csv
+
+transformations:
+  - read_delimited:
+      delimiter: ","
+      encoding: "utf8"
+      header: all_files_same_headers
+      infer_column_types: true

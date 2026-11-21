@@ -1,385 +1,173 @@
-# Bank Marketing — Azure ML SDK v2
+# Bank Marketing on Azure Machine Learning
 
-Udacity **Machine Learning Engineer for Microsoft Azure — Project 2: Operationalizing Machine Learning Pipeline**
+Udacity Project 2 | Operationalizing a machine learning pipeline with Azure ML SDK v2
 
-This project is a modernized implementation of the Udacity Bank Marketing project using the **Azure Machine Learning Python SDK v2** (`azure-ai-ml`).
+This project predicts whether a bank marketing customer will subscribe to a term deposit (`y`). It trains and deploys an AutoML classifier for real-time scoring. A separate, two-step training pipeline validates the same data and trains a logistic regression baseline. Azure ML can run that pipeline from a batch endpoint or on a schedule.
 
-The original course materials use Azure ML SDK v1. This project updates the workflow to SDK v2 using AutoML, MLflow, Managed Online Endpoints, and REST-based inference.
+Start with [the master notebook](Project_2_Master_Notebook_SDK_v2_Working.ipynb). The [architecture notes](docs/architecture.md) describe the components and their roles.
 
----
+## Architecture
 
-## Project Architecture
+```
+Project_2_Master_Notebook_SDK_v2_Working.ipynb
+  uses src/settings.py and the project modules
+  |
+  bankmarketing:1 (CSV) → bankmarketing-mltable:1
+    |
+    +→ AutoML parent → winning child → registered MLflow model
+    |                                   |
+    |                                   +→ managed online endpoint / blue
+    |                                        JSON request → prediction
+    |
+    +→ validate_step → validated.csv → train_step
+                                         |
+                                         +→ model.joblib and metrics.json
 
-```text
-Bank Marketing Data
-        │
-        ▼
-prepare_data.py
-        │
-        ▼
-Cleaned MLTable Data Asset
-        │
-        ▼
-Azure ML AutoML
-        │
-        ▼
-Best AutoML Run
-        │
-        ▼
-MLflow Model
-        │
-        ▼
-Managed Online Endpoint
-        │
-        ▼
-Blue Deployment
-        │
-        ├── SDK v2 inference
-        │
-        └── REST inference
+       The training graph can run directly as a pipeline job.
+       Its registered component is deployed to a batch endpoint.
+       A separate JobSchedule starts a job from the pipeline definition.
 ```
 
-The deployment uses Azure ML's **MLflow no-code deployment** path, so the primary deployment does not require a custom `score.py` or manually maintained inference environment.
-
----
-
-## Repository Structure
-
-```text
-azure-ml-bankmarketing-sdk-v2/
-│
-├── notebooks/
-│   └── bankmarketing_sdk_v2.ipynb
-│       # Main SDK v2 project notebook
-│
-├── src/
-│   └── prepare_data.py
-│       # Data preparation
-│
-├── pipeline/
-│   └── bankmarketing_pipeline.py
-│       # SDK v2 prepare-data → AutoML pipeline
-│
-├── deployment/
-│   ├── deploy.py
-│   │   # Primary MLflow deployment script
-│   ├── consume.py
-│   │   # REST endpoint consumer
-│   ├── sample-request.json
-│   │   # Endpoint test payload
-│   ├── deploy_custom_environment.py
-│   ├── score.py
-│   └── conda_inference.yaml
-│       # Fallback/custom deployment files
-│
-├── environment/
-│   └── conda.yaml
-│       # Training/pipeline environment
-│
-├── README.md
-└── .gitignore
-```
-
----
-
-## Azure ML Resources
-
-| Resource         | Value                                 |
-| ---------------- | ------------------------------------- |
-| Workspace        | `UdacityWorkspace`                    |
-| Resource Group   | `udacity-practice`                    |
-| Region           | `eastus2`                             |
-| Compute          | `udacity-project2-cluster`            |
-| Compute SKU      | `Standard_DS2_v2`                     |
-| Data Asset       | `bankmarketing-clean-sdkv2:1`         |
-| AutoML Job       | `ivory_worm_z0wbhqwv9s`               |
-| Best Run         | `ivory_worm_z0wbhqwv9s_8`             |
-| Registered Model | `bankmarketing-automl-mlflow-model:4` |
-| Endpoint         | `bankmarketing-sdkv2-endpoint`        |
-| Deployment       | `blue`                                |
+The batch endpoint submits a training job and returns a job ID. The managed online endpoint returns predictions from the registered AutoML model. The logistic regression pipeline writes its own model artifact and training metrics.
 
----
+## Recorded run
 
-## Notebook
+The results below come from the notebook export, with workflow state saved on November 20, 2026. Resource availability and status can change after the export.
 
-The main notebook is:
+| Area | Recorded result |
+| --- | --- |
+| Workspace and compute | `udacity-project`, resource group `rg-udacity-azureml`, notebook instance `ci-udacity-project`, training cluster `cpu-cluster` |
+| Data | Raw file `bankmarketing:1` and training MLTable `bankmarketing-mltable:1`. The original `bankmarketing_train.csv` is comma-delimited. The preview showed 32,950 rows, 21 columns, 9 duplicate rows and no missing cells. |
+| Target distribution | `y` contained 29,258 `no` labels and 3,692 `yes` labels. |
+| Completed AutoML parent | `quirky_moon_6pbsp2k6rn`, reused by the notebook. The recorded parent used **accuracy** as the primary metric and five cross-validation folds. The winning **VotingEnsemble** scored **0.91542 accuracy**. |
+| Winning child and model | `quirky_moon_6pbsp2k6rn_3` (`mighty_fennel_qh0gnpwy`), registered as `bankmarketing-automl-model:1` with type MLflow. The winning child also reports **0.94596 weighted AUC**. |
+| Online deployment | `bankmarketing-endpoint` → `blue`, 100% traffic, one `Standard_DS1_v2` instance. The exported output shows Succeeded and Application Insights enabled. |
+| Scoring and monitoring | The SDK and Studio Test both returned `["no", "no"]` for two rows. The monitoring helper reported 10 successful responses from 10 requests. The optional benchmark was skipped. |
+| Pipeline graph | `pipelinejob-f7c9a84e-0adf-4ee0-b555-fb841ae3b913` was reused for the main graph check. Studio shows it also came through the batch endpoint. The parent and both children completed. |
+| Published pipeline | `bankmarketing_training_pipeline:1` is deployed to `bankmarketing-pipeline-endpoint`. Its default deployment is `bankmarketing-pipeline-v1`. |
+| Completed batch invocation | `pipelinejob-028e7e9f-f153-44b2-89d9-3e4e4f1bf298`, returned by the invocation and verified through both completed child steps. |
+| Completed scheduled run | `bankmarketing-pipeline-evidence-schedule-08584064011961835976846626091CU90`, created by `bankmarketing-pipeline-evidence-schedule`. The recorded daily recurrence was disabled after the evidence run. |
 
-```text
-notebooks/bankmarketing_sdk_v2.ipynb
-```
+**AutoML metric.** The recorded parent used accuracy. The current [submission helper](src/run_automl.py) sets `AUC_weighted` when building a new job. The parent and winning-child screenshots below show the observed accuracy.
 
-It supports two execution modes.
+**Pipeline job lineage.** The historical `outputs/final_workflow_state.json` repeats the graph job ID in its batch-invocation field. The batch invocation and child verification cells (section 50–52, shown as `In [65]` and `In [69]` in the HTML export) show the separate batch-created ID listed above. Before regenerating the state file, check the batch endpoint and schedule histories and use the IDs returned by those services. The graph job ending in `b913` is a reused, endpoint-associated run. The invocation documented in `In [65]` and `In [69]` is the distinct job ending in `f298`.
 
-### Existing Resources
+## Reproduce the workflow
 
-```python
-EXECUTION_MODE = "EXISTING"
-```
+Use the executable master notebook in **Azure ML Studio → Notebooks**. Use [requirements.txt](requirements.txt) for the interactive environment. The training pipeline has its own [conda environment](environment/conda.yaml).
 
-Use this mode to continue from the already completed AutoML job, model, endpoint, and deployment.
+1. **Foundation — notebook sections 0–14.** Start the compute instance and select the project kernel. Connect to the workspace, verify the compute cluster, and confirm the raw and MLTable versions. The CSV is stored separately from the export. Obtain the original course CSV or use the authorized copy backing the raw asset. Validate the input, then save `outputs/part0_workflow_state.json`.
+2. **AutoML and scoring — sections 15–39.** Read the foundation state. Reuse a completed AutoML job only after checking its actual input, metric and compute, or submit once using the notebook's guard. Open the winning child's outputs in Studio, register the folder containing `MLmodel`, and validate the resulting model version. Retrieve or create the managed endpoint and `blue`, check Application Insights and routing, run the scoring and logging cells, and save `outputs/part1_workflow_state.json`.
+3. **Pipeline, batch endpoint and schedule — sections 40–63.** Build and inspect the graph, then verify a completed parent and both steps. Register the component, verify the batch deployment and default, and follow a deliberate invocation using its returned job ID. Use the schedule's history to identify a scheduled run and disable further triggers. Verify the saved final state against the three job roles before collecting evidence.
 
-This is the recommended mode for reproducing the completed project without retraining or redeploying unnecessarily.
+Run the notebook cells one at a time. Check Studio for an in-progress or completed job before retrying a submit or invoke cell. Review the historical failed-endpoint deletion and batch retry cells before using them. Keep keys, tokens, private storage URIs and local workspace configuration out of shared output.
 
-### New Training / Deployment
+## Scoring API
 
-```python
-EXECUTION_MODE = "NEW"
-```
+The live model accepts an authenticated `POST` to the scoring URI shown on the endpoint's **Consume** page. The notebook's [request builder](deployment/request_builder.py) writes [sample-request.json](deployment/sample-request.json) with `input_data.columns`, `input_data.index`, and `input_data.data`. The request includes the model's feature columns and excludes `y`.
 
-This mode:
+Use the notebook's [scoring helper](deployment/scoring.py) or open **Endpoints → real-time endpoint → Test** and paste the generated JSON. The recorded SDK response was `["no", "no"]`. The Studio Test capture shows the JSON input and returned predictions. It does not display the HTTP status code. The [log helper](deployment/logging.py) retrieves deployment logs for `blue`. The API key belongs in the request authorization header and should be kept out of source control and screenshots.
 
-1. Creates a new AutoML classification job.
-2. Waits for completion.
-3. Identifies the winning child run.
-4. Calls `deployment/deploy.py`.
-5. Verifies the managed online endpoint.
-6. Tests SDK and REST inference.
+## Submission evidence
 
----
+The PNGs are grouped below in workflow order. Filenames begin with `p1`, `p2`, or `p3` for Guide Parts 1–3 and are stored in the root `screenshots/` folder.
 
-## AutoML
+The notebook’s screenshot inventory uses its original subfolder paths. The images below follow the flat folder convention used for this submission.
 
-The project uses Azure ML AutoML classification with:
+### Data
 
-```text
-Target column:       y
-Primary metric:      accuracy
-Cross-validation:    5 folds
-Compute:             udacity-project2-cluster
-Max trials:          10
-Concurrent trials:   1
-```
+![The versioned Bank Marketing MLTable is the classifier’s training input](screenshots/p1_step_12_bankmarketing_mltable.png)
 
-The completed AutoML experiment produced:
+Azure ML shows `bankmarketing-mltable:1` as a registered MLTable and identifies `bankmarketing:1` as its source.
 
-```text
-Parent job:
-ivory_worm_z0wbhqwv9s
+### AutoML
 
-Best child run:
-ivory_worm_z0wbhqwv9s_8
-```
+![The completed AutoML parent identifies the selected winner](screenshots/p2_step_17_automl_completed.png)
 
-The winning model was registered as:
+The AutoML parent completed using `bankmarketing-mltable:1`. Its best-model summary shows **VotingEnsemble** and **0.91542 accuracy**.
 
-```text
-bankmarketing-automl-mlflow-model:4
-```
+![The selected AutoML child completed and produced the model registered for serving](screenshots/p2_step_21_automl_winner.png)
 
----
+The winning child `quirky_moon_6pbsp2k6rn_3` completed with **0.91542 accuracy** and **0.94596 weighted AUC**.
 
-## Deployment
+### Deployment and logs
 
-The primary deployment mechanism is:
+![The blue deployment serves the registered AutoML model with Application Insights enabled](screenshots/p2_step_30_blue_app_insights.png)
 
-```text
-deployment/deploy.py
-```
+Deployment `blue` succeeded, serves `bankmarketing-automl-model:1`, receives 100% of traffic, and has Application Insights enabled.
 
-Example:
+![The notebook retrieved runtime logs for the blue deployment](screenshots/p2_step_33_deployment_logs.png)
 
-```bash
-cd deployment
+Notebook section 33 uses `deployment/logging.py` to retrieve deployment logs, including successful model download and container startup.
 
-python deploy.py --best_run_id ivory_worm_z0wbhqwv9s_8
-```
+### Scoring
 
-The script registers the winning MLflow model and deploys it to the managed online endpoint.
+![The managed online endpoint returned predictions for the submitted JSON payload](screenshots/p2_step_34_json_prediction.png)
 
-Azure ML supports deployment of MLflow models to managed online endpoints without requiring a custom scoring script for the standard MLflow deployment path.
+The Studio **Test** tab shows the JSON input and two returned predictions, `["no", "no"]`. Notebook section 34 also records the prediction using `deployment/scoring.py`.
 
-The files:
+### Pipeline and batch endpoint
 
-```text
-deploy_custom_environment.py
-score.py
-conda_inference.yaml
-```
+![The Bank Marketing pipeline completed validation and baseline training](screenshots/p3_step_42_completed_pipeline.png)
 
-are retained as fallback/reference implementations and are not the primary deployment path.
+The reused, endpoint-associated job ending in `b913` shows Bank Marketing input and both completed steps, `validate_step` and `train_step`.
 
----
+![The notebook records the parent and step runs shown in the Studio graph](screenshots/p3_step_42_notebook_step_runs.png)
 
-## Managed Online Endpoint
+Notebook section 42–45 reports the same parent job ending in `b913` and two completed child jobs.
 
-The deployed endpoint is:
+![The batch endpoint publishes the pipeline component through its default deployment](screenshots/p3_step_47_batch_deployment.png)
 
-```text
-bankmarketing-sdkv2-endpoint
-```
+The batch endpoint succeeded and uses `bankmarketing-pipeline-v1` as its default deployment for `bankmarketing_training_pipeline:1`.
 
-with:
+![The job returned by the batch endpoint completed both pipeline steps](screenshots/p3_step_50_completed_batch_invocation.png)
 
-```text
-Deployment:      blue
-Instance type:   Standard_DS2_v2
-Instance count:  1
-Traffic:         100%
-```
+The separate invocation ending in `f298` completed both steps. Studio shows the batch endpoint and deployment that launched it.
 
-Scoring URI:
+### Schedule
 
-```text
-https://bankmarketing-sdkv2-endpoint.eastus2.inference.ml.azure.com/score
-```
+![The schedule history links the trigger to a completed pipeline run](screenshots/p3_step_53_schedule_history.png)
 
----
+Jobs history for `bankmarketing-pipeline-evidence-schedule` shows a completed run at 3:14 p.m. on November 20, 2026.
 
-## Testing the Endpoint
+![The pipeline job linked from the schedule history completed both steps](screenshots/p3_step_53_scheduled_job_completed.png)
 
-### SDK v2
+The matching scheduled job ending in `CU90` completed both steps. Its job detail shows the same creation time as the history row.
 
-The notebook invokes the endpoint using:
+### Screencast
 
-```python
-response = ml_client.online_endpoints.invoke(
-    endpoint_name="bankmarketing-sdkv2-endpoint",
-    deployment_name="blue",
-    request_file="deployment/sample-request.json"
-)
+**Screencast link:** Pending recording.
 
-print(response)
-```
+Aim for four minutes, with readable text and clear narration in 1080p or higher at 16:9. Show the data and AutoML winner, then run a live JSON scoring request. Show the completed pipeline, the batch endpoint and invocation, then the completed scheduled job and disabled status. Test viewer access before adding the link.
 
-Result:
+### SDK v1 to SDK v2 evidence
 
-```text
-[false]
-```
+| Original rubric item | Evidence in this project |
+| --- | --- |
+| Registered dataset and AutoML experiment | Versioned MLTable and completed AutoML parent and child jobs |
+| ACI service, logs and scoring scripts | Managed online deployment with Application Insights, notebook log retrieval and JSON scoring |
+| RunDetails widget | Notebook parent and child status with the Studio job graph |
+| Published pipeline and pipeline endpoint | Versioned pipeline component deployed behind a batch endpoint |
+| Scheduled run | SDK v2 JobSchedule and the job shown in its history |
 
-### REST
+The published graph trains the logistic regression baseline. AutoML runs separately. Confirm with Udacity whether those two pieces together satisfy the original **AutoML module in the pipeline** item. The localhost Swagger criterion also needs confirmation. Studio lists the deployment’s Swagger URI, and the Test screenshot documents the input and output. The screenshot does not show a localhost Swagger viewer.
 
-The project also includes:
+Mentor references for the submission feedback field: [SDK v2 grading guidance](https://knowledge.udacity.com/questions/1086493) and [Project 2 migration discussion](https://knowledge.udacity.com/questions/1086380).
 
-```text
-deployment/consume.py
-```
+## Future performance improvements
 
-This script retrieves the endpoint credential through the Azure ML SDK and sends an HTTP POST request to the scoring URI.
+- Compare weighted AUC and precision–recall metrics on a held-out dataset. The target is imbalanced, and the pipeline baseline's current accuracy and AUC are training-set metrics.
+- If the model will score customers before a call, review feature availability and retrain without fields such as call duration that are known only afterward.
+- Measure p95 response time and error rate with a representative request load before tuning endpoint capacity. The ten successful notebook calls show that scoring worked for the sample.
 
-Validated result:
+## Key files
 
-```text
-Status code: 200
-Prediction: [false]
-```
-
----
-
-## Final Validation
-
-The completed deployment was successfully verified:
-
-```text
-AutoML job:
-    Completed
-
-Best child run:
-    ivory_worm_z0wbhqwv9s_8
-
-Registered model:
-    bankmarketing-automl-mlflow-model:4
-
-Endpoint:
-    bankmarketing-sdkv2-endpoint
-    Succeeded
-
-Deployment:
-    blue
-    Succeeded
-
-Traffic:
-    {'blue': 100}
-
-SDK v2 inference:
-    Successful
-
-REST inference:
-    HTTP 200 / Successful
-```
-
----
-
-## Data Preparation
-
-Raw Bank Marketing data is prepared using:
-
-```text
-src/prepare_data.py
-```
-
-The cleaned data is registered as:
-
-```text
-bankmarketing-clean-sdkv2:1
-```
-
-The project also includes an SDK v2 pipeline:
-
-```text
-pipeline/bankmarketing_pipeline.py
-```
-
-which represents the:
-
-```text
-Data Preparation → AutoML
-```
-
-workflow.
-
----
-
-## Environment
-
-Training and pipeline dependencies are defined in:
-
-```text
-environment/conda.yaml
-```
-
-The production deployment uses the MLflow model deployment path rather than manually recreating the training environment for inference.
-
----
-
-## Authentication
-
-Azure resources are accessed using:
-
-```python
-DefaultAzureCredential()
-```
-
-The REST consumer retrieves the endpoint key programmatically rather than storing the key in source code.
-
-**Do not commit Azure credentials, endpoint keys, or other secrets to GitHub.**
-
----
-
-## Technology Stack
-
-* Python
-* Azure Machine Learning SDK v2
-* Azure AutoML
-* MLflow
-* scikit-learn
-* MLTable
-* Managed Online Endpoints
-* REST API
-
----
-
-## References
-
-* [Azure Machine Learning](https://learn.microsoft.com/en-us/azure/machine-learning/)
-* [Managed Online Endpoints](https://learn.microsoft.com/en-us/azure/machine-learning/how-to-deploy-managed-online-endpoints)
-* [Deploy MLflow Models](https://learn.microsoft.com/en-us/azure/machine-learning/how-to-deploy-mlflow-models)
-* [Azure ML SDK v2 Deployment Tutorial](https://learn.microsoft.com/en-us/azure/machine-learning/tutorial-deploy-model)
-
----
-
-## Project Status
-
-**Completed and validated.**
-
-The Bank Marketing model has been trained with Azure ML AutoML, registered as an MLflow model, deployed to a Managed Online Endpoint, and successfully tested through both the Azure ML SDK v2 and REST API.
+| Path | Role |
+| --- | --- |
+| [Master notebook](Project_2_Master_Notebook_SDK_v2_Working.ipynb) | Connects the foundation, AutoML, serving, pipeline and schedule steps |
+| [src/settings.py](src/settings.py) | Project resource names and workflow settings |
+| [deployment/](deployment/) | Request builder, scoring, logging and monitoring helpers |
+| [pipeline/pipeline_definition.py](pipeline/pipeline_definition.py) | Two-step training graph and job validation |
+| [pipeline/steps/](pipeline/steps/) | Data validation and baseline training scripts |
+| [Pipeline registration](pipeline/component_registration.py), [batch deployment](pipeline/batch_deployment.py), [schedule](pipeline/schedule_management.py) | Pipeline publication and operationalization |
+| [docs/architecture.md](docs/architecture.md) | Architecture and operational workflow |
