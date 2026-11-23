@@ -136,7 +136,7 @@ The matching scheduled job ending in `CU90` completed both steps. Its job detail
 
 ### Screencast
 
-**Screencast link:** Pending recording.
+[Watch the Project 2 screencast on YouTube](https://youtu.be/QBVlHbDxhWU)
 
 Aim for four minutes, with readable text and clear narration in 1080p or higher at 16:9. Show the data and AutoML winner, then run a live JSON scoring request. Show the completed pipeline, the batch endpoint and invocation, then the completed scheduled job and disabled status. Test viewer access before adding the link.
 
